@@ -1,7 +1,7 @@
 
 from langchain.chat_models import ChatOpenAI
 from langchain.prompts import ChatPromptTemplate
-from langchain.document_loaders import UnstructuredFileLoader
+from langchain.document_loaders import UnstructuredFileLoader, UnstructuredPowerPointLoader
 from langchain.embeddings import CacheBackedEmbeddings, OpenAIEmbeddings
 from langchain.storage import LocalFileStore
 from langchain.text_splitter import CharacterTextSplitter
@@ -52,7 +52,7 @@ def embed_file(file):
         chunk_size=600,
         chunk_overlap=100,
     )
-    loader = UnstructuredFileLoader(file_path=file_path)
+    loader = UnstructuredPowerPointLoader(file_path=file_path) if file.name.endswith(".pptx") else  UnstructuredFileLoader(file_path=file_path) 
     docs = loader.load_and_split(text_splitter=splitter)
     try:
         if openai_api_key == "":
@@ -113,12 +113,12 @@ prompt = ChatPromptTemplate.from_messages(
 st.title("무엇이든 물어보세요!")
 
 st.caption("파일을 업로드하면 파일 내용을 기반으로 답변을 제공합니다.")
-st.caption("지원하는 파일 형식: .txt, .pdf, .docx")
-
+st.caption("지원하는 파일 형식: .txt, .pdf, .docx, .pptx")
 
 file = None
 with st.sidebar:
     api_key = st.text_input("API Key")
+    error_msg = st.error("API Key를 입력해주세요.")
     if api_key != "":
         llm = ChatOpenAI(
         model="gpt-4o-mini",
@@ -130,13 +130,13 @@ with st.sidebar:
         openai_api_key=api_key,
         )
         openai_api_key=api_key
+        error_msg.empty()
         file = st.file_uploader(
             "Upload a .txt .pdf or .docx file",
-            type=["pdf", "txt", "docx"],
+            type=["pdf", "txt", "docx", "pptx"],
         )
 
 if file:
-    print("파일 업로드됨")
     retriever = embed_file(file)
     if retriever is not None:
         send_message("주신 파일 잘 읽었습니다. 무엇이든 물어보세요!", "ai", save=False)
@@ -155,10 +155,8 @@ if file:
                 | prompt
                 | llm
             )
-
             with st.chat_message("ai"):
                 response = chain.invoke(message)
-            send_message(response.content, "ai")
     else:
         st.session_state["messages"] = []
 
